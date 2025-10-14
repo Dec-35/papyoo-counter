@@ -1,0 +1,16 @@
+{
+  "name": "papyoo-counter",
+  "version": "1.0.0",
+  "private": true,
+  "description": "",
+  "workspaces": ["client", "server"],
+  "scripts": {
+    "dev": "pnpm -r --parallel run dev",
+    "build": "pnpm -r run build",
+    "start": "pnpm --filter server run start"
+  },
+  "author": "",
+  "devDependencies": {
+    "concurrently": "^8.0.0"
+  }
+}
