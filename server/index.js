@@ -10,18 +10,16 @@ const app = express()
 app.use(cors())
 app.use(express.json())
 
+app.use(express.static(path.join(__dirname, 'dist')))
+
 // Example API route
 app.get('/api/hello', (req, res) => {
     res.json({ message: 'Hello from Express!' })
 })
 
-const staticPath = path.join(__dirname, '../dist');
-app.use(express.static(staticPath));
-
-// Handle SPA routing by sending index.html for any other request
-app.get('*', (req, res) => {
-    res.sendFile(path.join(staticPath, 'index.html'));
-});
+app.use((req, res) => {
+    res.sendFile(path.join(__dirname, 'dist', 'index.html'))
+})
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, '0.0.0.0', () => {
