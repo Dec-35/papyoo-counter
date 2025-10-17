@@ -10,18 +10,20 @@ const app = express()
 app.use(cors())
 app.use(express.json())
 
-// Serve built frontend
-app.use(express.static(path.join(__dirname, 'dist')))
-
 // Example API route
 app.get('/api/hello', (req, res) => {
     res.json({ message: 'Hello from Express!' })
 })
 
-// Catch-all (must be *after* all API routes)
-app.use((req, res) => {
-    res.sendFile(path.join(__dirname, 'dist', 'index.html'))
-})
+const staticPath = path.join(__dirname, '../dist');
+app.use(express.static(staticPath));
 
-const PORT = process.env.PORT || 3000
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`))
+// Handle SPA routing by sending index.html for any other request
+app.get('*', (req, res) => {
+    res.sendFile(path.join(staticPath, 'index.html'));
+});
+
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, '0.0.0.0', () => {
+    console.log(`Server listening on port ${PORT}`);
+});

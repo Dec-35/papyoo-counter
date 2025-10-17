@@ -1,35 +1,57 @@
-# ---------- Stage 1: Build ----------
-FROM node:22-alpine AS builder
-WORKDIR /app
-
-# Install pnpm
+# ---- Base Stage ----
+# Use an Alpine-based Node.js image for a smaller size
+FROM node:18-alpine AS base
+# Install pnpm globally
 RUN npm install -g pnpm
 
-# Copy monorepo files
-COPY pnpm-workspace.yaml package.json pnpm-lock.yaml ./
-COPY client ./client
-COPY server ./server
+# ---- Dependencies Stage ----
+# This stage is dedicated to installing all dependencies to leverage Docker's layer caching.
+FROM base AS deps
+WORKDIR /app
+# Copy only the necessary package management files
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY client/package.json ./client/
+COPY server/package.json ./server/
+# Install all dependencies for both client and server
+RUN pnpm install
 
-# Install all dependencies (client + server)
-RUN pnpm install --frozen-lockfile
-
-# Build frontend into server/dist
+# ---- Builder Stage ----
+# This stage builds the Vue.js client application.
+FROM deps AS builder
+WORKDIR /app
+# Copy the entire project source to provide the necessary context for Vite's relative output path.
+COPY . .
+# Run the client build script
 RUN pnpm --filter client run build
 
-# ---------- Stage 2: Production image ----------
-FROM node:22-alpine AS production
+# ---- Production Stage ----
+# This is the final, lean image that will be run in production.
+FROM base AS production
+ENV NODE_ENV=production
 WORKDIR /app
 
-# Install pnpm for runtime (optional)
-RUN npm install -g pnpm
+# Copy server dependency definitions from the root and server directory
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY server/package.json ./server/
+# Install only the production dependencies for the server
+RUN pnpm install --filter server --prod
 
-# Copy server only
-COPY --from=builder /app/server ./server
-COPY --from=builder /app/server/package.json ./package.json
+# Copy the server source code
+COPY server ./server
 
-WORKDIR /app/server
+# Copy the built client from the 'builder' stage into the server's 'dist' directory.
+# This matches your Vite config's outDir: '../server/dist'.
+# Your Express server should be configured to serve static files from this 'dist' folder.
+COPY --from=builder /app/server/dist ./server/dist
 
+# Install pm2 for process management
+RUN npm install -g pm2
+
+# Expose the port the server will run on
 EXPOSE 3000
 
-ENV NODE_ENV=production
-CMD ["pnpm", "start"]
+# Command to start the server using pm2.
+# PM2's 'no-daemon' mode is essential for Docker.
+# IMPORTANT: Adjust 'server/src/index.js' to your actual server entrypoint file.
+CMD ["pm2-runtime", "start", "server/src/index.js", "--name", "app"]
+
