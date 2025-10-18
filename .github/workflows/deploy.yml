@@ -29,8 +29,7 @@ jobs:
         with:
           route: POST /repos/${{ github.repository }}/deployments
           environment: production
-          auto_merge: false
-          required_contexts: []
+          auto_merge: 'false'
           description: "Deploying to VPS at papayoo.m-legal.fr"
           payload: '{"domain": "https://papayoo.m-legal.fr"}'
         env:
