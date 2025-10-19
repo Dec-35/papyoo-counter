@@ -70,7 +70,7 @@ export default {
 </script>
 
 <template>
-  <main class="w-full flex flex-col items-center px-4 pt-5 gap-2 h-full">
+  <main class="w-full flex flex-col items-center px-4 pt-5 gap-2 h-full max-w-[600px] mx-auto">
     <img src="@assets/tallLogo.png" alt="" width="300">
     <h3 class="mt-5 font-[jaro] text-lg w-full">Qui joue ?</h3>
     <div class="flex flex-col gap-0.5 w-full rounded-2xl max-h-[400px] overflow-y-auto">
