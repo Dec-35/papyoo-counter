@@ -73,15 +73,15 @@ export default {
   <main class="w-full flex flex-col items-center px-4 pt-5 gap-2 h-full max-w-[600px] mx-auto">
     <img src="@assets/tallLogo.png" alt="" width="300">
     <h3 class="mt-5 font-[jaro] text-lg w-full">Qui joue ?</h3>
-    <div class="flex flex-col gap-0.5 w-full rounded-2xl max-h-[400px] overflow-y-auto">
-      <div v-for="player in players" class="flex justify-between items-center bg-white gap-2 py-3 px-3 rounded" :key="player.id">
+    <transition-group name="player" tag="div" class="flex flex-col gap-0.5 w-full rounded-2xl max-h-[400px] overflow-y-auto overflow-x-hidden">
+      <div v-for="player in players" :key="player.id" class="flex justify-between items-center bg-white gap-2 py-3 px-3 rounded player-item">
         <span class="pfp">{{ player.username[0].toUpperCase() }}</span>
         <p class=" w-full font-medium">{{ player.username }}</p>
         <div class="px-2 hover:bg-gray-100 h-full cursor-pointer" @click="disablePlayer(player.id)">
           <i class="fas fa-trash-can"></i>
         </div>
       </div>
-    </div>
+    </transition-group>
     <div class="flex gap-2 w-full">
       <div class="relative w-full">
         <input ref="newPlayerInput" type="text" v-model="newPlayerName" @keydown.enter="createPlayer" @keydown.down="focusSuggestion"
@@ -133,4 +133,43 @@ button {
   font-size: 1rem;
   cursor: pointer;
 }
+
+/* Transition styles for players list */
+.player-enter-from {
+  opacity: 0;
+  transform: translateX(-60%) scale(0.18);
+}
+.player-enter-active {
+  transition: opacity 220ms ease, transform 220ms ease;
+}
+.player-enter-to {
+  opacity: 1;
+  transform: translateX(0) scale(1);
+}
+
+.player-leave-from {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+.player-leave-active {
+  transition: opacity 280ms ease, transform 280ms ease;
+}
+.player-leave-to {
+  opacity: 0;
+  transform: translateX(60%) scale(0.18);
+}
+
+/* Optional: subtle shadow/spacing for player items while animating */
+.player-item {
+  will-change: transform, opacity;
+  /* ensure transform-based FLIP works smoothly */
+  transition: transform 320ms cubic-bezier(.2,.8,.2,1), margin 320ms cubic-bezier(.2,.8,.2,1), opacity 280ms ease;
+  display: flex; /* matches template layout and makes transform predictable */
+}
+
+/* Move transition used by transition-group when siblings shift (FLIP) */
+.player-move {
+  transition: transform 320ms cubic-bezier(.2,.8,.2,1);
+}
+
 </style>
