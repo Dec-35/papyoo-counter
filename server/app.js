@@ -82,39 +82,6 @@ export function createApp() {
         res.json({message: 'Hello from Express!'})
     })
 
-    // Players CRUD used by tests
-    app.get('/api/players', async (req, res) => {
-      const col = getPlayersCollection()
-      const docs = await col.find({}).toArray()
-      res.json(docs.map(d => ({ id: d.id, username: d.username })))
-    })
-
-    app.post('/api/players', async (req, res) => {
-      const { id, username } = req.body || {}
-      if (!id || !username) return res.status(400).json({ error: 'id and username required' })
-      const col = getPlayersCollection()
-      const existing = await col.findOne({ id })
-      if (existing) return res.status(409).json({ error: 'Player already exists' })
-      await col.insertOne({ id, username })
-      res.status(201).json({ id, username })
-    })
-
-    app.get('/api/players/:id', async (req, res) => {
-      const id = req.params.id
-      const col = getPlayersCollection()
-      const doc = await col.findOne({ id })
-      if (!doc) return res.status(404).json({ error: 'Not found' })
-      res.json({ id: doc.id, username: doc.username })
-    })
-
-    app.delete('/api/players/:id', async (req, res) => {
-      const id = req.params.id
-      const col = getPlayersCollection()
-      const result = await col.deleteOne({ id })
-      if (result.deletedCount === 0) return res.status(404).json({ error: 'Not found' })
-      res.status(204).end()
-    })
-
     // Game routes
     // Get game state for a user (userId = -1 for public home view)
     app.get('/api/game/:userId', (req, res) => {
