@@ -1,8 +1,12 @@
 <script>
 import GameService from "./service/GameService.js";
+import PlayerList from './components/PlayerList.vue'
+import ScoreInput from './components/ScoreInput.vue'
+import PendingRoundReview from './components/PendingRoundReview.vue'
 
 export default {
   name: 'App',
+  components: { PlayerList, ScoreInput, PendingRoundReview },
   data() {
     return {
       username: null,
@@ -73,8 +77,9 @@ export default {
       }
     },
 
-    async submitScore() {
-      const raw = this.scoreInput
+    async submitScore(score) {
+      // accept either an emitted score param or fallback to local input
+      const raw = typeof score !== 'undefined' ? score : this.scoreInput
       if (raw === null || raw === undefined || raw === '') {
         alert('Entrez un score valide')
         return
@@ -156,6 +161,11 @@ export default {
       }
     },
 
+    leaveGameLocal(){
+      // clear local player view without notifying server
+      this.gameDto = null
+    },
+
     async markReady() {
       try {
         await GameService.ready(this.userId)
@@ -164,6 +174,10 @@ export default {
         console.error(e)
         alert('Impossible de confirmer la validation')
       }
+    },
+
+    onInvalidScore() {
+      alert('Score invalide — entrez un nombre')
     }
   },
   computed: {
@@ -181,6 +195,10 @@ export default {
       if (!this.gameDto || !this.gameDto.pendingRound) return false
       const ready = this.gameDto.pendingRound.ready || []
       return ready.includes(this.userId)
+    },
+
+    hasEnoughPlayers(){
+      return this.gameDto && this.gameDto.players && this.gameDto.players.length >= 2
     }
   }
 }
@@ -190,74 +208,65 @@ export default {
   <main class="w-full flex flex-col items-center px-4 pt-5 gap-2 h-full max-w-[600px] mx-auto">
     <img src="@assets/tallLogo.png" alt="" width="300">
     <div class="grow w-80 flex flex-col justify-center gap-2">
-      <h3 class="mt-5 font-[jaro] text-lg w-full">Qui joue ?</h3>
-      <input type="text" v-model="username"
-             placeholder="Entrez votre nom..." class="w-full rounded-full! px-4! z-20 relative mb-4">
+      <template v-if="!playerInGame">
+        <h3 class="mt-5 font-[jaro] text-lg w-full">Qui joue ?</h3>
+        <input type="text" v-model="username"
+               placeholder="Entrez votre nom..." class="w-full rounded-full! px-4! z-20 relative mb-4">
 
-      <button class="btn-main w-full py-2.5!" @click="joinGame" @keydown.enter="joinGame">
-        {{ isGameRunning ? 'Rejoindre la partie' : 'Démarrer une partie' }}
-        <i class="fa fa-play-circle ml-2"/>
-      </button>
+        <button class="btn-main w-full py-2.5!" @click="joinGame" @keydown.enter="joinGame">
+          {{ isGameRunning ? 'Rejoindre la partie' : 'Démarrer une partie' }}
+          <i class="fa fa-play-circle ml-2"/>
+        </button>
+      </template>
 
-      <div v-if="gameDto" class="mt-4 bg-white p-3 rounded shadow w-full">
+      <div v-if="gameDto && playerInGame" class="mt-4 bg-white p-3 rounded shadow w-full">
         <div class="flex justify-between items-center mb-2">
           <strong>Partie en cours (tour {{ gameDto.currentRound }})</strong>
           <span class="text-sm">Status: {{ gameDto.status }}</span>
         </div>
-        <ul class="mb-3">
-          <li v-for="p in gameDto.players" :key="p.id" class="flex justify-between">
-            <span>{{ p.username }} <small v-if="p.id===userId">(Vous)</small></span>
-            <span>
-              Total: {{ p.totalScore || 0 }}
-              <span v-if="p.submittedScore !== null && typeof p.submittedScore !== 'undefined'"> — Soumis: {{ p.submittedScore }}</span>
-            </span>
-          </li>
-        </ul>
 
-        <div v-if="playerInGame">
-          <!-- Always allow score input when player is in game and no pendingRound exists -->
-          <div v-if="!gameDto.pendingRound" class="flex gap-2 items-center">
-            <input type="number" v-model="scoreInput" placeholder="Entrez votre score" class="flex-1" />
-            <button @click="submitScore" class="btn-main">Soumettre</button>
-            <button @click="leaveGame" class="btn-secondary">Leave</button>
+        <!-- Player list component -->
+        <div class="mb-3">
+          <PlayerList :players="gameDto.players" :userId="userId" />
+        </div>
+        <div v-if="!isGameRunning">
+          <div class="text-sm mt-2">Partie terminée</div>
+        </div>
+        <div v-else-if="playerInGame">
+          <!-- Score input or pending review are handled by components -->
+          <div v-if="!gameDto.pendingRound && hasEnoughPlayers">
+            <ScoreInput :initial="scoreInput" @submit="submitScore" @invalid="onInvalidScore" />
           </div>
 
-          <!-- When a pendingRound exists, show the summary and allow players to confirm (ready) -->
-          <div v-else class="mt-3 border p-2 rounded">
-            <strong>Round {{ gameDto.pendingRound.roundNumber }} — Vérifier les scores</strong>
-            <ul class="mt-2">
-              <li v-for="s in gameDto.pendingRound.scores" :key="s.id" class="flex justify-between">
-                <span>{{ s.username }} <small v-if="s.id===userId">(Vous)</small></span>
-                <span>{{ s.score }}</span>
-              </li>
-            </ul>
-            <div class="mt-2 flex gap-2">
-              <button @click="markReady" :disabled="isReady" class="btn-main">{{ isReady ? 'Ready ✓' : 'Ready' }}</button>
-              <button @click="leaveGame" class="btn-secondary">Leave</button>
-            </div>
-            <div class="text-sm mt-2">
-              <span>Validés: {{ (gameDto.pendingRound.ready || []).length }} / {{ gameDto.players.length }}</span>
-            </div>
+          <div v-else-if="hasEnoughPlayers">
+            <PendingRoundReview :pending="gameDto.pendingRound" :userId="userId" :playersCount="gameDto.players.length" @ready="markReady" />
           </div>
-         </div>
 
-         <div v-else class="text-sm mt-2">Vous n'êtes pas encore dans cette partie.</div>
-       </div>
+          <div v-else>
+            <div class="text-sm mt-2">En attente de plus de joueurs pour commencer la partie...</div>
+          </div>
+        </div>
 
-     </div>
-     <button class="btn-secondary w-80 mb-20">
-       Leaderboard
-       <i class="fa fa-medal ml-2"/>
-     </button>
-   </main>
- </template>
+        <div v-else class="text-sm mt-2">Vous n'êtes pas encore dans cette partie.</div>
+      </div>
+      <template v-if="playerInGame">
+        <button v-if="isGameRunning" @click="leaveGame" class="btn-secondary w-full mt-2">Quitter la partie <i class="fa fa-person-through-window ml-2"/></button>
+        <button v-else @click="leaveGameLocal" class="btn-secondary w-full mt-2">Accueil <i class="fa fa-home ml-2"/></button>
+      </template>
+    </div>
+    <button v-if="!playerInGame" class="btn-secondary w-80 mb-20">
+      Leaderboard
+      <i class="fa fa-medal ml-2"/>
+    </button>
+  </main>
+</template>
 
- <style>
+<style>
 
- button {
-   padding: 0.5rem 1rem;
-   font-size: 1rem;
-   cursor: pointer;
- }
+button {
+  padding: 0.5rem 1rem;
+  font-size: 1rem;
+  cursor: pointer;
+}
 
- </style>
+</style>

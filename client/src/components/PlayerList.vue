@@ -1,0 +1,38 @@
+<template>
+  <ul>
+    <li v-for="p in sortedPlayers" :key="p.id" class="flex justify-between py-1">
+      <span>{{ p.username }} <small v-if="p.id===userId">(Vous)</small></span>
+      <span>
+        Total: {{ p.totalScore || 0 }}
+        <span v-if="p.submittedScore !== null && typeof p.submittedScore !== 'undefined'"> — Soumis: {{ p.submittedScore }}</span>
+      </span>
+    </li>
+  </ul>
+</template>
+
+<script>
+export default {
+  name: 'PlayerList',
+  props: {
+    players: {
+      type: Array,
+      default: () => []
+    },
+    userId: {
+      type: String,
+      default: null
+    }
+  },
+  computed: {
+    sortedPlayers() {
+      return this.players.slice().sort((a, b) => a.totalScore - b.totalScore)
+    }
+  }
+}
+</script>
+
+<style scoped>
+ul { margin: 0; padding: 0; list-style: none; }
+li { display: flex; justify-content: space-between; }
+</style>
+
