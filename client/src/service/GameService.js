@@ -67,6 +67,16 @@ export default {
         })
         if (!res.ok) throw new Error('Failed to mark ready')
         return await res.json()
+    },
+
+    async reject(userId) {
+        const res = await fetch('/api/game/reject', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId })
+        })
+        if (!res.ok) throw new Error('Failed to reject score')
+        return await res.json()
     }
 
 }

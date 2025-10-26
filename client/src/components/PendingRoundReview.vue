@@ -1,17 +1,28 @@
 <template>
   <div class="mt-3 text-center border py-8 rounded">
-    <div>Votre score : <b>{{playerScore.score}}</b></div>
-    <div class="mt-2 flex gap-2">
-      <!-- If the current user's score was auto-filled, show a validation button for them -->
-      <button
-        v-if="!isReady"
-        @click="$emit('ready')"
-        :disabled="isReady"
-        class="btn-main mx-auto">
-        Valider le score calculé
-      </button>
+    <div v-if="playerScore">
+      Votre score : <b>{{ playerScore.score }}</b>
+      <span v-if="playerScore.autoFilled" class="text-sm text-gray-500">(auto-calculé)</span>
+    </div>
+
+    <div class="mt-2 flex gap-2 justify-center">
+      <!-- If the current user's score was auto-filled, show validation/rejection buttons -->
+      <template v-if="playerScore && playerScore.autoFilled && !isReady">
+        <button
+          @click="$emit('ready')"
+          class="btn-main">
+          Valider le score
+        </button>
+        <button
+          @click="$emit('reject')"
+          class="btn-danger">
+          Rejeter
+        </button>
+      </template>
+
+      <!-- If the user submitted manually or is ready -->
       <div v-else class="text-sm">
-        En attente des autres joueurs ({{pending.ready.length}}/{{playersCount}} prêts)
+        En attente des autres joueurs ({{ pending.ready.length }}/{{ playersCount }} prêts)
       </div>
     </div>
   </div>
@@ -40,4 +51,15 @@ export default {
 
 <style scoped>
 ul { margin: 0; padding: 0; list-style: none; }
+.btn-danger {
+  background-color: #ef4444;
+  color: white;
+  font-weight: bold;
+  padding: 0.5rem 1rem;
+  border: none;
+  cursor: pointer;
+}
+.btn-danger:hover {
+  background-color: #dc2626;
+}
 </style>

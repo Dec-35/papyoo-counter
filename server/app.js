@@ -50,7 +50,11 @@ function finalizePendingRound() {
 
   // Clear pending and reset submittedScore for next round
   currentGame.pendingRound = null
-  currentGame.players.forEach(p => { p.submittedScore = null; delete p._autoFilled })
+  currentGame.players.forEach(p => {
+    p.submittedScore = null
+    delete p._autoFilled
+    delete p.previousScore
+  })
 
   currentGame.currentRound += 1
 
@@ -121,7 +125,8 @@ export function createApp() {
         id: p.id,
         username: p.username,
         totalScore: p.totalScore || 0,
-        submittedScore: typeof p.submittedScore === 'number' ? p.submittedScore : null
+        submittedScore: typeof p.submittedScore === 'number' ? p.submittedScore : null,
+        previousScore: typeof p.previousScore === 'number' ? p.previousScore : null
       }))
 
       const response = {
@@ -184,6 +189,7 @@ export function createApp() {
       player.submittedScore = Number(score)
       // Mark this as a manual submission (not auto-filled)
       player._autoFilled = false
+      delete player.previousScore // Clean up previous score on new submission
 
       // Count how many submitted (manual submissions so far)
       const manualSubmittedIds = currentGame.players.filter(p => typeof p.submittedScore === 'number').map(p => p.id)
@@ -249,6 +255,40 @@ export function createApp() {
 
       broadcastGameUpdate()
       res.json({ message: 'Marked ready' })
+    })
+
+    // Player rejects an auto-filled score
+    app.post('/api/game/reject', (req, res) => {
+      const { userId } = req.body || {}
+      if (!userId) return res.status(400).json({ error: 'userId required' })
+      if (!currentGame || !currentGame.pendingRound) return res.status(400).json({ error: 'No pending round to reject' })
+
+      const playerInGame = currentGame.players.find(p => p.id === userId)
+      if (!playerInGame) return res.status(404).json({ error: 'Player not in game' })
+
+      const scoreInPendingRound = currentGame.pendingRound.scores.find(s => s.id === userId)
+      if (!scoreInPendingRound || !scoreInPendingRound.autoFilled) {
+        return res.status(403).json({ error: 'Only the player with an auto-filled score can reject' })
+      }
+
+      // Rejection logic: clear the pending round, and reset all submitted scores for the current round
+      // We keep the submitted scores in a temporary property to pre-fill inputs on the client
+      currentGame.players.forEach(p => {
+        p.previousScore = p.submittedScore
+        p.submittedScore = null
+        delete p._autoFilled
+      })
+
+      // The player who rejected should not have a pre-filled input
+      const rejectingPlayer = currentGame.players.find(p => p.id === userId)
+      if (rejectingPlayer) {
+        rejectingPlayer.previousScore = null
+      }
+
+      currentGame.pendingRound = null
+
+      broadcastGameUpdate()
+      res.json({ message: 'Round rejected. All players must re-submit their scores.' })
     })
 
     // Next round (admin/manual finalize)

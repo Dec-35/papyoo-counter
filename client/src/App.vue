@@ -47,6 +47,15 @@ export default {
         } else {
           this.gameDto = null
         }
+
+        // After a score rejection, the server clears pendingRound and moves scores to 'previousScore'
+        // Use this to pre-fill the input.
+        if (this.gameDto && !this.gameDto.pendingRound && this.playerInGame && typeof this.playerInGame.previousScore === 'number') {
+          this.scoreInput = this.playerInGame.previousScore
+        } else if (this.gameDto && !this.gameDto.pendingRound) {
+          // If we are back to score input for any other reason (e.g. new round), clear the input.
+          this.scoreInput = ''
+        }
       } catch (e) {
         console.error('Failed to fetch game state', e)
         this.gameDto = null
@@ -176,6 +185,16 @@ export default {
       }
     },
 
+    async rejectScore() {
+      try {
+        await GameService.reject(this.userId)
+        await this.getGameState()
+      } catch (e) {
+        console.error(e)
+        alert('Impossible de rejeter le score')
+      }
+    },
+
     onInvalidScore() {
       alert('Score invalide — entrez un nombre')
     }
@@ -189,6 +208,10 @@ export default {
     playerInGame(){
       if (!this.gameDto || !this.gameDto.players) return null
       return this.gameDto.players.find(p => p.id === this.userId) || null
+    },
+
+    playerHasSubmitted() {
+      return this.playerInGame && typeof this.playerInGame.submittedScore === 'number'
     },
 
     isReady(){
@@ -239,7 +262,7 @@ export default {
           </div>
 
           <div v-else-if="hasEnoughPlayers">
-            <PendingRoundReview :pending="gameDto.pendingRound" :userId="userId" :playersCount="gameDto.players.length" @ready="markReady" />
+            <PendingRoundReview :pending="gameDto.pendingRound" :userId="userId" :playersCount="gameDto.players.length" @ready="markReady" @reject="rejectScore" />
           </div>
 
           <div v-else>
