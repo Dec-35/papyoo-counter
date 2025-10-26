@@ -69,6 +69,12 @@ export default {
         return await res.json()
     },
 
+    async getLeaderboard() {
+        const res = await fetch('/api/leaderboard')
+        if (!res.ok) throw new Error('Failed to get leaderboard')
+        return await res.json()
+    },
+
     async reject(userId) {
         const res = await fetch('/api/game/reject', {
             method: 'POST',

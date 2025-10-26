@@ -2,7 +2,7 @@ import path from 'path'
 import {fileURLToPath} from 'url'
 import express from 'express'
 import cors from 'cors'
-import {getPlayersCollection} from './db.js'
+import {getPlayersCollection, getGameHistoryCollection} from './db.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -39,7 +39,7 @@ function createEmptyGame(creator) {
   }
 }
 
-function finalizePendingRound() {
+async function finalizePendingRound() {
   if (!currentGame || !currentGame.pendingRound) return
 
   // Apply submitted scores to totals and push the round
@@ -47,6 +47,21 @@ function finalizePendingRound() {
     p.totalScore = (p.totalScore || 0) + (typeof p.submittedScore === 'number' ? p.submittedScore : 0)
   })
   currentGame.rounds.push(currentGame.pendingRound)
+
+  // Save round to history
+  try {
+    const historyCollection = getGameHistoryCollection()
+    const roundData = {
+      gameId: currentGame.id,
+      roundNumber: currentGame.currentRound,
+      scores: currentGame.pendingRound.scores.map(s => ({ userId: s.id, username: s.username, score: s.score })),
+      finalizedAt: new Date()
+    }
+    await historyCollection.insertOne(roundData)
+  } catch (e) {
+    console.error('Failed to save round to history', e)
+  }
+
 
   // Clear pending and reset submittedScore for next round
   currentGame.pendingRound = null
@@ -109,6 +124,50 @@ export function createApp() {
       }
 
       res.json(response)
+    })
+
+    app.get('/api/leaderboard', async (req, res) => {
+      try {
+        const historyCollection = getGameHistoryCollection()
+        const playersCollection = getPlayersCollection()
+
+        const stats = await historyCollection.aggregate([
+          { $unwind: '$scores' },
+          {
+            $group: {
+              _id: '$scores.userId',
+              totalScore: { $sum: '$scores.score' },
+              roundsPlayed: { $sum: 1 }
+            }
+          },
+          {
+            $project: {
+              userId: '$_id',
+              avgScore: { $divide: ['$totalScore', '$roundsPlayed'] },
+              gamesPlayed: '$roundsPlayed', // Assuming one round is one "game" for this stat
+              _id: 0
+            }
+          }
+        ]).toArray()
+
+        // Get player usernames
+        const playerIds = stats.map(s => s.userId)
+        const players = await playersCollection.find({ id: { $in: playerIds } }).toArray()
+        const playerMap = players.reduce((acc, p) => {
+          acc[p.id] = p.username
+          return acc
+        }, {})
+
+        const leaderboard = stats.map(s => ({
+          ...s,
+          username: playerMap[s.userId] || 'Unknown Player'
+        })).sort((a, b) => a.avgScore - b.avgScore) // Sort by lowest average score
+
+        res.json(leaderboard)
+      } catch (e) {
+        console.error('Failed to get leaderboard', e)
+        res.status(500).json({ error: 'Failed to retrieve leaderboard data' })
+      }
     })
 
     // Start a game (called by first player)
@@ -180,12 +239,15 @@ export function createApp() {
         // Build roundScores including autoFilled flag
         const roundScores = currentGame.players.map(p => ({ id: p.id, username: p.username, score: p.submittedScore, autoFilled: !!p._autoFilled }))
 
-        // Initialize ready list with IDs of players who submitted manually (those with _autoFilled === false)
-        const readyIds = currentGame.players.filter(p => typeof p._autoFilled !== 'undefined' && p._autoFilled === false).map(p => p.id)
+        // Initialize ready list with IDs of players who submitted manually.
+        // The auto-filled player will not be in this list and devra valider.
+        const readyIds = currentGame.players
+          .filter(p => !p._autoFilled)
+          .map(p => p.id)
 
         currentGame.pendingRound = { roundNumber: currentGame.currentRound, scores: roundScores, createdAt: Date.now(), ready: readyIds }
 
-        // If everyone had submitted manually, finalize immediately
+        // If everyone had submitted manually (no auto-filled player), finalize immediately
         if (readyIds.length === currentGame.players.length) {
           finalizePendingRound()
           broadcastGameUpdate()
@@ -216,7 +278,8 @@ export function createApp() {
       const allReady = currentGame.players.length > 0 && currentGame.pendingRound.ready.length === currentGame.players.length
       if (allReady) {
         finalizePendingRound()
-        broadcastGameUpdate()
+        // Add a small delay to prevent race conditions on the client
+        setTimeout(() => broadcastGameUpdate(), 100)
         return res.json({ message: 'All ready — round finalized' })
       }
 

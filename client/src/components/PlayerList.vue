@@ -4,7 +4,7 @@
       <span>{{ p.username }} <small v-if="p.id===userId">(Vous)</small></span>
       <span>
         Total: {{ p.totalScore || 0 }}
-        <span v-if="p.submittedScore !== null && typeof p.submittedScore !== 'undefined'"> — Soumis: {{ p.submittedScore }}</span>
+        <span v-if="p.submittedScore !== null && typeof p.submittedScore !== 'undefined'"> — {{ isPlayerScoreAutoFilled(p.id) ? "Calculé" : "Soumis"}}: {{ p.submittedScore }}</span>
       </span>
     </li>
   </ul>
@@ -18,6 +18,10 @@ export default {
       type: Array,
       default: () => []
     },
+    pending: {
+      type: Object,
+      default: () => ({})
+    },
     userId: {
       type: String,
       default: null
@@ -25,7 +29,15 @@ export default {
   },
   computed: {
     sortedPlayers() {
+      console.log(this.pending)
       return this.players.slice().sort((a, b) => a.totalScore - b.totalScore)
+    }
+  },
+  methods: {
+    isPlayerScoreAutoFilled(playerId) {
+      if (!this.pending || !this.pending.scores) return false
+      const scoreEntry = this.pending.scores.find(s => s.id === playerId)
+      return scoreEntry ? !!scoreEntry.autoFilled : false
     }
   }
 }
