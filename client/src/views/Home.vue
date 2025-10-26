@@ -280,7 +280,7 @@ export default {
       </button>
     </template>
   </div>
-  <router-link v-if="!playerInGame" to="/leaderboard" class="btn-secondary w-80 mb-20">
+  <router-link v-if="!playerInGame" to="/leaderboard" class="btn-secondary w-full mb-20">
     Leaderboard
     <i class="fa fa-medal ml-2"/>
   </router-link>
