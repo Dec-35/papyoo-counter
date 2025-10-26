@@ -1,69 +1,186 @@
 <script>
-import playerService from "./service/playerService.js";
+import GameService from "./service/GameService.js";
 
 export default {
   name: 'App',
   data() {
     return {
-      message: '',
-      players: [],
-      suggestions: [],
-      newPlayerName: ''
+      username: null,
+      gameDto: null,
+      userId: null,
+      ws: null,
+      scoreInput: '',
+      wsConnected: false,
+      reconnectAttempts: 0,
     }
   },
   mounted() {
-    this.fetchPlayers();
+    // initialize userId and username from localStorage
+    const storedUsername = localStorage.getItem('username');
+    if (storedUsername) {
+      this.username = storedUsername;
+    }
+
+    let storedId = localStorage.getItem('userId')
+    if (!storedId) {
+      storedId = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2,8)}`
+      localStorage.setItem('userId', storedId)
+    }
+    this.userId = storedId
+
+    this.setupWebSocket()
+    this.getGameState();
   },
   methods: {
-    fetchPlayers() {
-      playerService.getPlayers().then((players) => {
-        this.players = players;
-      })
-    },
-    async createPlayer() {
-      if (this.newPlayerName.trim() === '') return;
-      await playerService.addPlayer(this.newPlayerName);
-      this.newPlayerName = '';
-      this.fetchPlayers();
-
-      await this.$nextTick(() => {
-        this.$refs.newPlayerInput.focus();
-      });
-    },
-    async enablePlayer(id) {
-      await playerService.enablePlayer(id);
-      this.fetchPlayers();
-      this.suggestions = [];
-      this.newPlayerName = '';
-
-      await this.$nextTick(() => {
-        this.$refs.newPlayerInput.focus();
-      });
-    },
-    getSuggestions(value) {
-      playerService.getSuggestions(value).then((suggestions) => {
-        this.suggestions = suggestions;
-      })
-    },
-    async disablePlayer(id) {
-      await playerService.disablePlayer(id);
-      this.fetchPlayers();
-    },
-    focusSuggestion() {
-      this.$nextTick(() => {
-        if (this.suggestions.length > 0) {
-          this.$refs['suggestion_0'][0].focus();
+    async getGameState() {
+      try {
+        const data = await GameService.getGameStatus(this.userId)
+        // backend returns { game: null } when no game, otherwise the game object directly
+        if (data && Object.prototype.hasOwnProperty.call(data, 'game')) {
+          this.gameDto = data.game
+        } else if (data && data.id) {
+          this.gameDto = data
+        } else {
+          this.gameDto = null
         }
-      });
-    }
-  },
-  watch: {
-    newPlayerName(value) {
-      if (value.trim() === '') {
-        this.suggestions = [];
+      } catch (e) {
+        console.error('Failed to fetch game state', e)
+        this.gameDto = null
+      }
+    },
+
+    async joinGame(){
+      if(!this.username || this.username.trim().length === 0) {
+        alert("Veuillez entrer un nom valide.");
         return;
       }
-      this.getSuggestions(value);
+      const usernameTrimmed = this.username.trim()
+      localStorage.setItem('username', usernameTrimmed);
+
+      try {
+        if(!this.isGameRunning) {
+          // start a new game
+          await GameService.startGame(this.userId, usernameTrimmed)
+        } else {
+          // join existing game
+          await GameService.joinGame(this.userId, usernameTrimmed)
+        }
+        // fetch updated state
+        await this.getGameState()
+      } catch (err) {
+        console.error(err)
+        alert(err.message || 'Erreur lors de la tentative de rejoindre/démarrer la partie')
+      }
+    },
+
+    async submitScore() {
+      const raw = this.scoreInput
+      if (raw === null || raw === undefined || raw === '') {
+        alert('Entrez un score valide')
+        return
+      }
+      const num = Number(raw)
+      if (Number.isNaN(num)) { alert('Score doit être un nombre'); return }
+
+      try {
+        await GameService.postScore(this.userId, num)
+        this.scoreInput = ''
+        await this.getGameState()
+      } catch (e) {
+        console.error(e)
+        alert('Impossible d\'envoyer le score')
+      }
+    },
+
+    async nextRound(){
+      try {
+        await GameService.nextRound()
+        await this.getGameState()
+      } catch (e) {
+        console.error(e)
+        alert('Impossible de passer au tour suivant')
+      }
+    },
+
+    setupWebSocket() {
+      const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws'
+      const wsUrl = `${protocol}://${window.location.host}/ws`
+
+      try {
+        this.ws = new WebSocket(wsUrl)
+      } catch (e) {
+        console.warn('WebSocket init failed', e)
+        return
+      }
+
+      this.ws.addEventListener('open', () => {
+        this.wsConnected = true
+        this.reconnectAttempts = 0
+        console.log('WS connected')
+      })
+
+      this.ws.addEventListener('message', (ev) => {
+        try {
+          const msg = JSON.parse(ev.data)
+          // On any game:update ping, refresh state
+          if (msg && (msg.type === 'game:update' || msg.type === 'connected')) {
+            this.getGameState()
+          }
+        } catch (e) {
+          // ignore non-json messages
+        }
+      })
+
+      this.ws.addEventListener('close', () => {
+        this.wsConnected = false
+        // attempt reconnect with backoff
+        this.reconnectAttempts += 1
+        const delay = Math.min(30000, 500 * this.reconnectAttempts)
+        setTimeout(() => this.setupWebSocket(), delay)
+      })
+
+      this.ws.addEventListener('error', (e) => {
+        // log and let close handler handle reconnect
+        console.warn('WS error', e)
+      })
+    },
+
+    async leaveGame() {
+      try {
+        await GameService.leaveGame(this.userId)
+        // clear local player view
+        await this.getGameState()
+      } catch (e) {
+        console.error(e)
+        alert('Impossible de quitter la partie')
+      }
+    },
+
+    async markReady() {
+      try {
+        await GameService.ready(this.userId)
+        await this.getGameState()
+      } catch (e) {
+        console.error(e)
+        alert('Impossible de confirmer la validation')
+      }
+    }
+  },
+  computed: {
+    isGameRunning(){
+      // return true if a game currently running based on gameDto
+      return !!(this.gameDto && this.gameDto.status === 'running')
+    },
+
+    playerInGame(){
+      if (!this.gameDto || !this.gameDto.players) return null
+      return this.gameDto.players.find(p => p.id === this.userId) || null
+    },
+
+    isReady(){
+      if (!this.gameDto || !this.gameDto.pendingRound) return false
+      const ready = this.gameDto.pendingRound.ready || []
+      return ready.includes(this.userId)
     }
   }
 }
@@ -72,104 +189,75 @@ export default {
 <template>
   <main class="w-full flex flex-col items-center px-4 pt-5 gap-2 h-full max-w-[600px] mx-auto">
     <img src="@assets/tallLogo.png" alt="" width="300">
-    <h3 class="mt-5 font-[jaro] text-lg w-full">Qui joue ?</h3>
-    <transition-group name="player" tag="div" class="flex flex-col gap-0.5 w-full rounded-2xl max-h-[400px] overflow-y-auto overflow-x-hidden">
-      <div v-for="player in players" :key="player.id" class="flex justify-between items-center bg-white gap-2 py-3 px-3 rounded player-item">
-        <span class="pfp">{{ player.username[0].toUpperCase() }}</span>
-        <p class=" w-full font-medium">{{ player.username }}</p>
-        <div class="px-2 hover:bg-gray-100 h-full cursor-pointer" @click="disablePlayer(player.id)">
-          <i class="fas fa-trash-can"></i>
-        </div>
-      </div>
-    </transition-group>
-    <div class="flex gap-2 w-full">
-      <div class="relative w-full">
-        <input ref="newPlayerInput" type="text" v-model="newPlayerName" @keydown.enter="createPlayer" @keydown.down="focusSuggestion"
-               placeholder="Entrez le nom d'un joueur..." class="w-full rounded-full! px-4! z-20 relative">
+    <div class="grow w-80 flex flex-col justify-center gap-2">
+      <h3 class="mt-5 font-[jaro] text-lg w-full">Qui joue ?</h3>
+      <input type="text" v-model="username"
+             placeholder="Entrez votre nom..." class="w-full rounded-full! px-4! z-20 relative mb-4">
 
-        <div v-if="suggestions.length > 0" class="absolute top-0 pt-11 z-10 flex flex-col gap-1 w-full mt-1 bg-gray-300 p-1 rounded-2xl">
-          <div tabindex="0"
-               :ref="'suggestion_' + index"
-               class="bg-gray-100 text-black px-3 py-1.5 w-full rounded-xl hover:bg-gray-200 cursor-pointer"
-               v-for="(suggestion, index) in suggestions" @click="enablePlayer(suggestion.id)"
-               @keydown.enter="enablePlayer(suggestion.id)">{{ suggestion.username }}
-          </div>
-        </div>
-
-      </div>
-      <button @click="createPlayer" class="btn-main">Ajouter</button>
-    </div>
-    <div class="grow w-60 flex flex-col justify-center gap-2">
-      <button class="btn-main w-full py-2.5!">
-        Nouvelle partie
+      <button class="btn-main w-full py-2.5!" @click="joinGame" @keydown.enter="joinGame">
+        {{ isGameRunning ? 'Rejoindre la partie' : 'Démarrer une partie' }}
         <i class="fa fa-play-circle ml-2"/>
       </button>
-      <button class="btn-secondary w-full">
-        Leaderboard
-        <i class="fa fa-medal ml-2"/>
-      </button>
-    </div>
-  </main>
-</template>
 
-<style>
+      <div v-if="gameDto" class="mt-4 bg-white p-3 rounded shadow w-full">
+        <div class="flex justify-between items-center mb-2">
+          <strong>Partie en cours (tour {{ gameDto.currentRound }})</strong>
+          <span class="text-sm">Status: {{ gameDto.status }}</span>
+        </div>
+        <ul class="mb-3">
+          <li v-for="p in gameDto.players" :key="p.id" class="flex justify-between">
+            <span>{{ p.username }} <small v-if="p.id===userId">(Vous)</small></span>
+            <span>
+              Total: {{ p.totalScore || 0 }}
+              <span v-if="p.submittedScore !== null && typeof p.submittedScore !== 'undefined'"> — Soumis: {{ p.submittedScore }}</span>
+            </span>
+          </li>
+        </ul>
 
-.pfp {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 2rem;
-  aspect-ratio: 1;
-  border-radius: 50%;
-  line-height: 2px;
-  background-color: #d7d7d7;
-  color: #363636;
-  font-weight: 500;
-  font-size: 12px;
-}
+        <div v-if="playerInGame">
+          <!-- Always allow score input when player is in game and no pendingRound exists -->
+          <div v-if="!gameDto.pendingRound" class="flex gap-2 items-center">
+            <input type="number" v-model="scoreInput" placeholder="Entrez votre score" class="flex-1" />
+            <button @click="submitScore" class="btn-main">Soumettre</button>
+            <button @click="leaveGame" class="btn-secondary">Leave</button>
+          </div>
 
-button {
-  padding: 0.5rem 1rem;
-  font-size: 1rem;
-  cursor: pointer;
-}
+          <!-- When a pendingRound exists, show the summary and allow players to confirm (ready) -->
+          <div v-else class="mt-3 border p-2 rounded">
+            <strong>Round {{ gameDto.pendingRound.roundNumber }} — Vérifier les scores</strong>
+            <ul class="mt-2">
+              <li v-for="s in gameDto.pendingRound.scores" :key="s.id" class="flex justify-between">
+                <span>{{ s.username }} <small v-if="s.id===userId">(Vous)</small></span>
+                <span>{{ s.score }}</span>
+              </li>
+            </ul>
+            <div class="mt-2 flex gap-2">
+              <button @click="markReady" :disabled="isReady" class="btn-main">{{ isReady ? 'Ready ✓' : 'Ready' }}</button>
+              <button @click="leaveGame" class="btn-secondary">Leave</button>
+            </div>
+            <div class="text-sm mt-2">
+              <span>Validés: {{ (gameDto.pendingRound.ready || []).length }} / {{ gameDto.players.length }}</span>
+            </div>
+          </div>
+         </div>
 
-/* Transition styles for players list */
-.player-enter-from {
-  opacity: 0;
-  transform: translateX(-60%) scale(0.18);
-}
-.player-enter-active {
-  transition: opacity 220ms ease, transform 220ms ease;
-}
-.player-enter-to {
-  opacity: 1;
-  transform: translateX(0) scale(1);
-}
+         <div v-else class="text-sm mt-2">Vous n'êtes pas encore dans cette partie.</div>
+       </div>
 
-.player-leave-from {
-  opacity: 1;
-  transform: translateY(0) scale(1);
-}
-.player-leave-active {
-  transition: opacity 280ms ease, transform 280ms ease;
-}
-.player-leave-to {
-  opacity: 0;
-  transform: translateX(60%) scale(0.18);
-}
+     </div>
+     <button class="btn-secondary w-80 mb-20">
+       Leaderboard
+       <i class="fa fa-medal ml-2"/>
+     </button>
+   </main>
+ </template>
 
-/* Optional: subtle shadow/spacing for player items while animating */
-.player-item {
-  will-change: transform, opacity;
-  /* ensure transform-based FLIP works smoothly */
-  transition: transform 320ms cubic-bezier(.2,.8,.2,1), margin 320ms cubic-bezier(.2,.8,.2,1), opacity 280ms ease;
-  display: flex; /* matches template layout and makes transform predictable */
-}
+ <style>
 
-/* Move transition used by transition-group when siblings shift (FLIP) */
-.player-move {
-  transition: transform 320ms cubic-bezier(.2,.8,.2,1);
-}
+ button {
+   padding: 0.5rem 1rem;
+   font-size: 1rem;
+   cursor: pointer;
+ }
 
-</style>
+ </style>
