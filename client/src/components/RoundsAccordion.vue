@@ -1,6 +1,6 @@
 <template>
   <div class="rounded-lg overflow-y-auto grow">
-    <div v-if="!rounds || rounds.length === 0" class="p-4 text-sm text-gray-600">Aucun round précédent</div>
+    <div v-if="!rounds || rounds.length === 0"></div>
 
     <div v-else class="flex flex-col gap-0.5">
       <div v-for="(r, idx) in sortedRounds" :key="r.roundNumber" class="bg-gray-100 rounded">
@@ -14,10 +14,10 @@
 
         </div>
 
-        <div v-show="openIndex === idx" class="m-2 rounded-md overflow-hidden">
+        <div v-show="openIndex === idx" class="m-2 rounded-md overflow-hidden border border-gray-300 shadow-sm">
           <table class="w-full text-left">
             <thead>
-              <tr class="border-b bg-gray-200 border-b-gray-100">
+              <tr class="border-b bg-gray-100 border-b-gray-200">
                 <th class="py-2 px-2">Joueur</th>
                 <th class="py-2 px-2">Score</th>
               </tr>

@@ -132,35 +132,52 @@ export function createApp() {
         const historyCollection = getGameHistoryCollection()
         const playersCollection = getPlayersCollection()
 
+        // Compute a per-score performance index normalized by number of players in the round:
+        // performance = 1 - (score / (250 / numPlayers)) = 1 - (score * numPlayers / 250)
+        // Higher is better. We'll clamp final averages later if needed.
         const stats = await historyCollection.aggregate([
+          // compute numPlayers for each round document
+          { $addFields: { numPlayers: { $size: '$scores' } } },
+          // unwind scores into one document per player per round
           { $unwind: '$scores' },
+          // project fields we need and compute per-round performance
+          {
+            $project: {
+              userId: '$scores.userId',
+              username: '$scores.username',
+              score: '$scores.score',
+              numPlayers: '$numPlayers',
+              performance: {
+                $subtract: [1, { $divide: [{ $multiply: ['$scores.score', '$numPlayers'] }, 250] }]
+              }
+            }
+          },
+          // group by user and average the performance across rounds
           {
             $group: {
-              _id: '$scores.userId',
-              totalScore: { $sum: '$scores.score' },
+              _id: '$userId',
+              avgPerformance: { $avg: '$performance' },
               roundsPlayed: { $sum: 1 }
             }
           },
           {
             $project: {
               userId: '$_id',
-              avgScore: { $divide: ['$totalScore', '$roundsPlayed'] },
-              gamesPlayed: '$roundsPlayed', // Assuming one round is one "game" for this stat
+              avgPerformance: 1,
+              gamesPlayed: '$roundsPlayed',
               _id: 0
             }
           }
         ]).toArray()
 
-        // Get player usernames
+        // Get player usernames (same logic as before to handle different id types)
         const playerIds = stats.map(s => s.userId)
-        // Try to match documents where `id` field equals userId OR where `_id` equals an ObjectId representation
         const possibleObjectIds = []
         const possibleNumericIds = []
         for (const id of playerIds) {
           if (typeof id === 'string' && /^[0-9a-fA-F]{24}$/.test(id)) {
             try { possibleObjectIds.push(new ObjectId(id)) } catch (e) { /* ignore invalid */ }
           }
-          // also consider purely numeric ids stored as Number in DB
           if (typeof id === 'string' && /^-?\d+$/.test(id)) {
             possibleNumericIds.push(Number(id))
           }
@@ -175,14 +192,12 @@ export function createApp() {
           ? await playersCollection.find({ $or: queryOr }).toArray()
           : []
 
-        // Build map supporting both `id` and `_id` keys
         const playerMap = players.reduce((acc, p) => {
           if (typeof p.id !== 'undefined') acc[String(p.id)] = p.username
           if (p._id) acc[String(p._id)] = p.username
           return acc
         }, {})
 
-        // Fallback: if some userIds were not found in `players`, try to get a username from game_history
         const missingIds = playerIds.filter(pid => !playerMap[String(pid)] && !playerMap[pid])
         if (missingIds.length > 0) {
           try {
@@ -198,15 +213,15 @@ export function createApp() {
               }
             }
           } catch (e) {
-            // If history lookup fails, ignore and fall back to Unknown Player
             console.warn('Failed to lookup usernames in history fallback', e)
           }
         }
 
+        // Build leaderboard using avgPerformance (higher is better)
         const leaderboard = stats.map(s => ({
           ...s,
           username: playerMap[String(s.userId)] || playerMap[s.userId] || 'Unknown Player'
-        })).sort((a, b) => a.avgScore - b.avgScore) // Sort by lowest average score
+        })).sort((a, b) => b.avgPerformance - a.avgPerformance)
 
         res.json(leaderboard)
       } catch (e) {
