@@ -47,7 +47,7 @@
       <div class="mb-4">
         <h2 class="text-lg font-semibold mb-2">Dernières parties</h2>
         <div v-if="!stats.recentRounds || stats.recentRounds.length === 0" class="text-sm text-gray-500">Aucune partie trouvée</div>
-        <div v-else class="space-y-4">
+        <div v-else class="space-y-2">
           <div v-for="g in groupedGames" :key="g.gameId" class="p-3 rounded-lg shadow-sm border border-gray-300 bg-white">
             <!-- header clickable to toggle accordion -->
             <div class="flex items-center justify-between cursor-pointer select-none" role="button" tabindex="0" :aria-expanded="!!expanded[g.gameId]" @click="toggleGame(g.gameId)" @keydown.enter="toggleGame(g.gameId)" @keydown.space.prevent="toggleGame(g.gameId)" :aria-controls="'game-' + g.gameId">
@@ -115,7 +115,8 @@ export default {
     },
     formatPerf(v) {
       const num = (typeof v === 'number' && Number.isFinite(v)) ? v : 0
-      return (num * 100).toFixed(1) + '%'
+      const clamped = Math.max(-1, Math.min(1, num))
+      return (clamped * 100).toFixed(1) + '%'
     },
     shortId(s) {
       if (!s) return ''

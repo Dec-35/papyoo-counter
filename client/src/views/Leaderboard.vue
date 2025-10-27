@@ -14,7 +14,7 @@
           </tr>
           </thead>
           <tbody>
-          <tr v-for="(player, index) in leaderboard" :key="player.userId" class="hover:bg-gray-50 not-last:border-b border-gray-200" :class="{'font-bold' : isCurrentPlayer(player)}">
+          <tr v-for="(player, index) in leaderboard" :key="player.userId" class="hover:bg-gray-50 not-last:border-b border-gray-200" :class="{'font-bold!' : isCurrentPlayer(player)}">
             <td class="p-2">
               <router-link
                   :to="{ name: 'PlayerStats', params: { userId: player.userId } }"
