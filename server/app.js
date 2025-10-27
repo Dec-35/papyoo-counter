@@ -262,6 +262,10 @@ export function createApp() {
                   1,
                   { $size: { $filter: { input: '$allScores', as: 'o', cond: { $lt: ['$$o.score', '$scores.score'] } } } }
                 ]
+              },
+              // Clamp per-round performance to [-1, 1] for extrema computations
+              performanceClamped: {
+                $max: [ -1, { $min: [ 1, { $subtract: [ 1, { $divide: [ { $multiply: ['$scores.score', 2] }, 250 ] } ] } ] } ]
               }
             }
           },
@@ -278,8 +282,8 @@ export function createApp() {
               avgScore: { $avg: '$score' },
               zeros: { $sum: { $cond: [{ $eq: ['$score', 0] }, 1, 0] } },
               fulls: { $sum: { $cond: [{ $eq: ['$score', 250] }, 1, 0] } },
-              bestPerformance: { $max: '$performance' },
-              worstPerformance: { $min: '$performance' },
+              bestPerformance: { $max: '$performanceClamped' },
+              worstPerformance: { $min: '$performanceClamped' },
               top1: { $sum: { $cond: [{ $eq: ['$rank', 1] }, 1, 0] } },
               top3: { $sum: { $cond: [{ $lte: ['$rank', 3] }, 1, 0] } },
               recentRounds: { $push: { roundNumber: '$roundNumber', score: '$score', numPlayers: '$numPlayers', performance: '$performance', rank: '$rank', finalizedAt: '$finalizedAt', gameId: '$gameId' } }

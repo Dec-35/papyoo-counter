@@ -251,7 +251,7 @@ export default {
     <div v-if="gameDto && playerInGame" class="bg-white p-3 gap-3 rounded-xl shadow w-full grow overflow-y-hidden flex flex-col">
       <div class="flex justify-between items-center">
         <strong>Partie {{gameDto.status === 'running' ? 'en cours' : 'terminée'}} (tour {{ gameDto.currentRound }})</strong>
-        <span class="flex items-center gap-2 text-gray-500 text-xs">{{wsStatus}} <span class="h-1.5 w-1.5 rounded-full inline-block" :class="wsConnected ? 'bg-green-500' : 'bg-red-500'" /></span>
+        <span class="flex items-center gap-1.5 text-gray-500 text-xs">{{wsStatus}} <span class="h-1.5 w-1.5 rounded-full inline-block" :class="wsConnected ? 'bg-green-400' : 'bg-red-400'" /></span>
       </div>
       <!-- Player list component -->
       <PlayerList :players="gameDto.players" :userId="userId" :pending="gameDto.pendingRound"/>
