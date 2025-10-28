@@ -1,25 +1,18 @@
 <template>
-  <div class="rounded-lg overflow-y-auto grow">
+  <div class="grow">
     <div v-if="!rounds || rounds.length === 0"></div>
 
-    <div v-else class="flex flex-col gap-0.5">
-      <div v-for="(r, idx) in sortedRounds" :key="r.roundNumber" class="bg-gray-100 rounded">
-        <div @click="toggle(idx)" class="w-full text-left p-3 flex justify-between items-center hover:bg-gray-100">
-          <span class="flex">
-            <span class="block">
-              <strong>Tour {{ r.roundNumber }}</strong>
-            </span>
-          </span>
-          <span class="text-sm text-gray-600">{{ (r.scores || []).length }} joueurs <i class="fa fa-chevron-down ml-2 duration-300" :class="{'rotate-180' : openIndex === idx}"></i></span>
-
-        </div>
-
-        <div v-show="openIndex === idx" class="m-2 rounded-md overflow-hidden border border-gray-300 shadow-sm">
+    <div v-else class="flex gap-1 overflow-x-auto overflow-y-visible py-2">
+      <div v-for="(r, idx) in sortedRounds" :key="r.roundNumber" class="min-w-[250px] relative h-fit bg-gray-100 rounded-lg border border-gray-300 overflow-visible">
+        <span class="block font-medium text-sm absolute top-1 -translate-1/2 left-1/2 bg-gray-50 border border-gray-200 rounded-md px-1.5 py-0.5 z-10">
+          Tour {{ r.roundNumber }}
+        </span>
+        <div class="overflow-hidden rounded-lg">
           <table class="w-full text-left">
             <thead>
               <tr class="border-b bg-gray-100 border-b-gray-200">
                 <th class="py-2 px-2">Joueur</th>
-                <th class="py-2 px-2">Score</th>
+                <th class="py-2 px-2 w-[3rem]">Score</th>
               </tr>
             </thead>
             <tbody>

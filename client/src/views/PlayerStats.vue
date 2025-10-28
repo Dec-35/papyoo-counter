@@ -101,7 +101,7 @@
                    :class="['flex justify-between items-center px-3 py-2.5', idx !== 0 && 'border-t border-gray-200']">
                 <div class="text-sm text-gray-700 flex items-center gap-2">
                   <span class="font-medium">Tour {{ r.roundNumber }}</span>
-                  <span class="text-gray-500 italic">- {{ r.numPlayers }} joueurs</span>
+                  <span class="text-gray-500 italic">• {{ r.numPlayers }} joueurs</span>
                 </div>
                 <div class="flex items-center gap-3">
                    <span

@@ -236,7 +236,7 @@ export default {
 </script>
 
 <template>
-  <div class="grow w-full flex flex-col justify-center gap-2 overflow-hidden">
+  <div class="grow w-full flex flex-col justify-center gap-2">
     <template v-if="!playerInGame">
       <h3 class="mt-5 font-[jaro] text-lg w-full">Qui joue ?</h3>
       <input type="text" v-model="username"
@@ -247,7 +247,16 @@ export default {
         <i class="fa fa-play-circle ml-2"/>
       </button>
     </template>
-
+    <div v-if="playerInGame" class="flex gap-3">
+      <button v-if="isGameRunning" @click="leaveGame" class="btn-secondary btn-danger grow">Quitter la partie <i
+          class="fa fa-person-through-window ml-2 mt-1"/></button>
+      <button v-else @click="leaveGameLocal" class="btn-secondary grow">Accueil <i class="fa fa-home ml-2"/>
+      </button>
+      <router-link to="/leaderboard" class="btn-secondary grow">
+        Leaderboard
+        <i class="fa fa-medal ml-2"/>
+      </router-link>
+    </div>
     <div v-if="gameDto && playerInGame" class="bg-white p-3 gap-3 rounded-xl shadow w-full grow overflow-y-hidden flex flex-col">
       <div class="flex justify-between items-center">
         <strong>Partie {{gameDto.status === 'running' ? 'en cours' : 'terminée'}} (tour {{ gameDto.currentRound }})</strong>
@@ -279,12 +288,6 @@ export default {
 
       <div v-else class="text-sm mt-2">Vous n'êtes pas encore dans cette partie.</div>
     </div>
-    <template v-if="playerInGame">
-      <button v-if="isGameRunning" @click="leaveGame" class="btn-secondary w-full mt-2">Quitter la partie <i
-          class="fa fa-person-through-window ml-2 mt-1"/></button>
-      <button v-else @click="leaveGameLocal" class="btn-secondary w-full mt-2">Accueil <i class="fa fa-home ml-2"/>
-      </button>
-    </template>
   </div>
   <router-link v-if="!playerInGame" to="/leaderboard" class="btn-secondary w-full mb-20">
     Leaderboard

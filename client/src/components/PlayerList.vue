@@ -44,7 +44,6 @@ export default {
   },
   computed: {
     sortedPlayers() {
-      console.log(this.pending)
       return this.players.slice().sort((a, b) => a.totalScore - b.totalScore)
     },
     showLastColumn() {
