@@ -182,7 +182,37 @@ router.get('/player/:userId/stats', async (req, res) => {
         return res.status(404).json({ error: 'No data for this player' })
       }
 
-      res.json(result[0])
+      const playerStats = result[0]
+
+      // Calculate global rank by comparing this player's avgPerformance with all other players
+      const allPlayersStats = await historyCollection.aggregate([
+        { $addFields: { numPlayers: { $size: '$scores' } } },
+        { $unwind: '$scores' },
+        {
+          $project: {
+            userId: '$scores.userId',
+            performance: {
+              $subtract: [1, { $divide: [{ $multiply: ['$scores.score', '$numPlayers'] }, 250] }]
+            }
+          }
+        },
+        {
+          $group: {
+            _id: '$userId',
+            avgPerformance: { $avg: '$performance' }
+          }
+        }
+      ]).toArray()
+
+      // Count how many players have strictly better avgPerformance (higher is better)
+      const betterPlayersCount = allPlayersStats.filter(p =>
+        p.avgPerformance > playerStats.avgPerformance
+      ).length
+
+      playerStats.rank = betterPlayersCount + 1
+      playerStats.totalPlayers = allPlayersStats.length
+
+      res.json(playerStats)
     } catch (e) {
       console.error('Failed to get player stats', e)
       res.status(500).json({ error: 'Failed to retrieve player stats' })
@@ -190,4 +220,3 @@ router.get('/player/:userId/stats', async (req, res) => {
 })
 
 export default router
-
