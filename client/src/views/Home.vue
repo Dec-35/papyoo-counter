@@ -1,5 +1,5 @@
 <script>
-import GameService from "../service/GameService.js";
+import GameService from "../service/game.js";
 import PlayerList from '../components/PlayerList.vue'
 import ScoreInput from '../components/ScoreInput.vue'
 import PendingRoundReview from '../components/PendingRoundReview.vue'
