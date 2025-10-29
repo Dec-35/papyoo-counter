@@ -6,7 +6,26 @@
     <div v-else>
       <div class="flex items-center justify-between mb-4">
         <div>
-          <h1 class="text-2xl font-bold">{{ stats.username || userId }}</h1>
+          <div class="flex items-center gap-2 mb-1">
+            <h1 class="text-2xl font-bold relative mb-1" style="line-height: 0.9em;">{{ stats.username || userId }}
+              <i v-if="stats.rank === 1" class="text-xl fa fa-crown absolute text-yellow-500 rotate-45 -translate-x-2 -translate-y-1"></i>
+            </h1>
+            <!-- Pill affichant le rang global -->
+            <span
+              v-if="stats.rank && stats.totalPlayers"
+              :class="[
+                'px-2 ml-2 py-0.5 rounded-md text-sm font-semibold',
+                stats.rank === 1 ? 'ml-4 bg-green-100 text-green-800 border border-green-300' :
+                stats.rank === 2 ? 'bg-purple-200 text-purple-800 border border-purple-400' :
+                stats.rank === 3 ? 'bg-amber-100 text-amber-800 border border-amber-300' :
+                stats.rank === stats.totalPlayers ? 'bg-red-100 text-red-800 border border-red-300' :
+                'bg-blue-100 text-blue-800 border border-blue-300'
+              ]"
+            >
+              {{ formatGlobalRank(stats.rank) }} / {{ stats.totalPlayers }}
+            </span>
+          </div>
+
           <div class="text-sm text-gray-500">{{ stats.gamesPlayed || 0 }}
             parties jouées dont {{ stats.roundsPlayed }} rounds
           </div>

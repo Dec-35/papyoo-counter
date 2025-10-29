@@ -15,13 +15,15 @@
           </thead>
           <tbody>
           <tr v-for="(player, index) in leaderboard" :key="player.userId" class="hover:bg-gray-50 not-last:border-b border-gray-200" :class="{'font-bold!' : isCurrentPlayer(player)}">
-            <td class="p-2">
+            <td class="p-2 relative">
               <router-link
                   :to="{ name: 'PlayerStats', params: { userId: player.userId } }"
                   class="text-black!"
               >
                 {{ index + 1 + ". " + player.username }}
-              </router-link></td>
+              </router-link>
+              <i v-if="index === 0" class="text-sm fa fa-crown absolute text-yellow-500 rotate-12 -translate-x-2 -translate-y-1"></i>
+            </td>
             <td class="p-2 text-right">{{ formatPerf(player.avgPerformance) }}</td>
             <td class="p-2 text-right">{{ player.gamesPlayed }}</td>
           </tr>
