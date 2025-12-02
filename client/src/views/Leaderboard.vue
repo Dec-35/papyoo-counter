@@ -19,7 +19,7 @@
       </div>
       <div v-if="mode === 'monthly'" class="month-selector">
         <button type="button" class="month-selector__btn" @click="changeMonth(-1)">
-          &larr; Mois préc.
+          &larr;
         </button>
         <span class="month-selector__label">{{ formattedMonth }}</span>
         <button
@@ -27,9 +27,9 @@
           class="month-selector__btn"
           :disabled="isCurrentMonth"
           @click="changeMonth(1)"
-        >Mois suiv. &rarr;</button>
+        >&rarr;</button>
       </div>
-      <div v-else class="month-selector__label text-center text-gray-600">Classement global</div>
+      <div v-else class="month-selector__label text-center text-gray-600 mt-4">Classement global</div>
     </div>
     <div v-if="loading" class="text-center">Chargement...</div>
     <div v-if="error" class="text-red-500 text-center">{{ error }}</div>
@@ -101,8 +101,10 @@ export default {
   mounted() {
     let storedId = localStorage.getItem('userId')
     if(storedId) this.$root.userId = storedId
-  },
-  async created() {
+    const savedMode = localStorage.getItem('leaderboardMode')
+    if (savedMode === 'monthly' || savedMode === 'all-time') {
+      this.mode = savedMode
+    }
     this.load()
   },
   methods: {
@@ -135,6 +137,8 @@ export default {
     setMode(newMode) {
       if (this.mode === newMode) return
       this.mode = newMode
+      // save to local storage
+      localStorage.setItem('leaderboardMode', newMode)
       this.load()
     },
     changeMonth(direction) {
