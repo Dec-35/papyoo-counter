@@ -5,7 +5,7 @@
 
     <div v-else>
       <div class="flex items-center justify-between mb-4">
-        <div>
+        <div class="flex-1">
           <div class="flex items-center gap-2 mb-1">
             <h1 class="text-2xl font-bold relative mb-1" style="line-height: 0.9em;">{{ stats.username || userId }}
               <i v-if="stats.rank === 1" class="text-xl fa fa-crown absolute text-yellow-500 rotate-45 -translate-x-2 -translate-y-1"></i>
@@ -29,6 +29,27 @@
           <div class="text-sm text-gray-500">{{ stats.gamesPlayed || 0 }}
             parties jouées dont {{ stats.roundsPlayed }} rounds
           </div>
+        </div>
+
+        <!-- Icon buttons: copy UUID (other profiles only) or settings link (own profile) -->
+        <div class="flex items-center gap-1">
+          <button
+            v-if="!isOwnProfile"
+            type="button"
+            class="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-300 bg-white text-gray-500 hover:bg-gray-50 transition-colors"
+            :title="uuidCopied ? 'Copié !' : 'Copier UUID'"
+            @click="copyUuid"
+          >
+            <i :class="uuidCopied ? 'fa fa-check text-green-500' : 'fa fa-copy text-sm'"></i>
+          </button>
+          <router-link
+            v-if="isOwnProfile"
+            :to="{ name: 'Settings' }"
+            class="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-300 bg-white text-gray-500 hover:bg-gray-50 transition-colors"
+            title="Paramètres"
+          >
+            <i class="fa fa-gear text-sm"></i>
+          </router-link>
         </div>
       </div>
 
@@ -161,7 +182,8 @@ export default {
       stats: {},
       loading: true,
       error: null,
-      expanded: {} // track expanded state of each gameId
+      expanded: {},
+      uuidCopied: false,
     }
   },
   async mounted() {
@@ -251,7 +273,24 @@ export default {
       if (rank === 1) return "1er"
       if (rank === numPlayers) return "dernier"
       return `${rank}ème`
-    }
+    },
+    async copyUuid() {
+      try {
+        await navigator.clipboard.writeText(String(this.userId))
+        this.uuidCopied = true
+        setTimeout(() => { this.uuidCopied = false }, 2000)
+      } catch {
+        // fallback: select a temp input
+        const el = document.createElement('input')
+        el.value = String(this.userId)
+        document.body.appendChild(el)
+        el.select()
+        document.execCommand('copy')
+        document.body.removeChild(el)
+        this.uuidCopied = true
+        setTimeout(() => { this.uuidCopied = false }, 2000)
+      }
+    },
   },
   computed: {
     groupedGames() {
@@ -293,6 +332,10 @@ export default {
       // sort groups by latestAt desc
       groups.sort((a, b) => b.latestAt - a.latestAt)
       return groups
+    },
+    isOwnProfile() {
+      const currentUserId = this.$root.userId || localStorage.getItem('userId')
+      return currentUserId && String(currentUserId) === String(this.userId)
     },
     performanceTrend() {
       const games = this.groupedGames
