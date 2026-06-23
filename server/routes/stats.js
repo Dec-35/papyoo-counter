@@ -239,4 +239,43 @@ router.get('/player/:userId/stats', async (req, res) => {
     }
 })
 
+router.post('/player/merge', async (req, res) => {
+  try {
+    const { fromId, toId } = req.body || {}
+    if (!fromId || !toId) return res.status(400).json({ error: 'fromId and toId required' })
+    if (String(fromId) === String(toId)) return res.status(400).json({ error: 'fromId and toId must differ' })
+
+    const historyCollection = getGameHistoryCollection()
+
+    // Update every round doc that has a scores entry with fromId
+    const result = await historyCollection.updateMany(
+      { 'scores.userId': { $in: [fromId, String(fromId)] } },
+      [
+        {
+          $set: {
+            scores: {
+              $map: {
+                input: '$scores',
+                as: 's',
+                in: {
+                  $cond: [
+                    { $eq: [{ $toString: '$$s.userId' }, String(fromId)] },
+                    { $mergeObjects: ['$$s', { userId: toId }] },
+                    '$$s'
+                  ]
+                }
+              }
+            }
+          }
+        }
+      ]
+    )
+
+    res.json({ merged: result.modifiedCount })
+  } catch (e) {
+    console.error('Failed to merge players', e)
+    res.status(500).json({ error: 'Failed to merge players' })
+  }
+})
+
 export default router

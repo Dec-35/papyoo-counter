@@ -16,5 +16,18 @@ export default {
         const res = await fetch(`/api/player/${encodeURIComponent(userId)}/stats`)
         if (!res.ok) throw new Error('Failed to get player stats')
         return await res.json()
+    },
+
+    async mergePlayer(fromId, toId) {
+        const res = await fetch('/api/player/merge', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ fromId, toId })
+        })
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}))
+            throw new Error(err.error || 'Failed to merge')
+        }
+        return await res.json()
     }
 }
